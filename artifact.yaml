@@ -1,0 +1,50 @@
+name: build-and-deploy
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --configuration Release --no-restore
+
+      - name: Publish
+        run: dotnet publish -c Release -o publish
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: $
+          tenant-id: $
+          subscription-id: $
+
+      - name: Deploy Infrastructure
+        run: |
+          az deployment group create \
+            --resource-group asabbour-ai \
+            --template-file main.bicep \
+            --parameters mysqlAdminPassword=$
+
+      - name: Deploy App Service
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: sabbour-blog-app
+          package: publish
